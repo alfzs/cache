@@ -1,14 +1,14 @@
-package storage
+package cache
 
 import (
 	"context"
 	"time"
 )
 
-// Storage - это обобщенный интерфейс хранилища данных, поддерживающий операции
+// Cache - это обобщенный интерфейс хранилища данных, поддерживающий операции
 // key-value и работу с очередями.
 // Параметр типа T позволяет работать с любыми типами данных.
-type Storage[T any] interface {
+type Cache[T any] interface {
 	// Операции с ключами и значениями
 
 	// Set сохраняет значение по указанному ключу с заданным временем жизни (TTL)
@@ -96,8 +96,8 @@ type RedisConfig struct {
 // Возвращает:
 //   - реализацию интерфейса Storage[T]
 //   - ошибку (в текущей реализации всегда nil)
-func NewMemory[T any](cleanupInterval time.Duration) (Storage[T], error) {
-	return newMemoryStorage[T](cleanupInterval), nil
+func NewMemory[T any](cleanupInterval time.Duration) (Cache[T], error) {
+	return newMemoryCache[T](cleanupInterval), nil
 }
 
 // NewRedis создает новое хранилище на основе Redis
@@ -105,6 +105,6 @@ func NewMemory[T any](cleanupInterval time.Duration) (Storage[T], error) {
 // Возвращает:
 //   - реализацию интерфейса Storage[T]
 //   - ошибку, если подключение не удалось
-func NewRedis[T any](config RedisConfig) (Storage[T], error) {
-	return newRedisStorage[T](config)
+func NewRedis[T any](config RedisConfig) (Cache[T], error) {
+	return newRedisCache[T](config)
 }

@@ -1,4 +1,4 @@
-package storage_test
+package cache_test
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newTestRedisStorage[T any](t *testing.T) storage.Storage[T] {
-	s, err := storage.NewRedis[T](storage.RedisConfig{
+func newTestRedisStorage[T any](t *testing.T) cache.Cache[T] {
+	s, err := cache.NewRedis[T](cache.RedisConfig{
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,

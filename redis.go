@@ -1,4 +1,4 @@
-package storage
+package cache
 
 import (
 	"context"
@@ -9,16 +9,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// redisStorage представляет реализацию хранилища данных на основе Redis.
+// redisCache представляет реализацию хранилища данных на основе Redis.
 // Это обобщенная структура, которая может работать с любым типом данных T.
-type redisStorage[T any] struct {
+type redisCache[T any] struct {
 	client *redis.Client // Клиент Redis для выполнения операций
 }
 
-// newRedisStorage создает новый экземпляр Redis-хранилища.
+// newRedisCache создает новый экземпляр Redis-хранилища.
 // Принимает конфигурацию RedisConfig и возвращает интерфейс Storage[T].
 // Выполняет проверку соединения с Redis через команду PING.
-func newRedisStorage[T any](cfg RedisConfig) (Storage[T], error) {
+func newRedisCache[T any](cfg RedisConfig) (Cache[T], error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     cfg.Addr,     // Адрес Redis сервера
 		Username: cfg.Username, // Имя пользователя
@@ -32,14 +32,14 @@ func newRedisStorage[T any](cfg RedisConfig) (Storage[T], error) {
 		return nil, fmt.Errorf("redis ping failed: %w", err)
 	}
 
-	return &redisStorage[T]{client: client}, nil
+	return &redisCache[T]{client: client}, nil
 }
 
 // Set сохраняет значение в Redis по указанному ключу.
 // Принимает контекст, ключ, значение и время жизни записи (TTL).
 // Если TTL > 0, устанавливает время жизни записи, иначе использует redis.KeepTTL.
 // Значение сериализуется в JSON перед сохранением.
-func (s *redisStorage[T]) Set(ctx context.Context, key string, value T, ttl time.Duration) error {
+func (s *redisCache[T]) Set(ctx context.Context, key string, value T, ttl time.Duration) error {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -67,7 +67,7 @@ func (s *redisStorage[T]) Set(ctx context.Context, key string, value T, ttl time
 // Возвращает значение, флаг наличия значения и ошибку.
 // Если ключ не найден, возвращает false во втором возвращаемом значении.
 // Значение десериализуется из JSON перед возвратом.
-func (s *redisStorage[T]) Get(ctx context.Context, key string) (T, bool, error) {
+func (s *redisCache[T]) Get(ctx context.Context, key string) (T, bool, error) {
 	var zero T // Нулевое значение типа T для возврата по умолчанию
 
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -91,7 +91,7 @@ func (s *redisStorage[T]) Get(ctx context.Context, key string) (T, bool, error) 
 
 // Delete удаляет значение из Redis по ключу.
 // Возвращает ошибку, если операция не удалась.
-func (s *redisStorage[T]) Delete(ctx context.Context, key string) error {
+func (s *redisCache[T]) Delete(ctx context.Context, key string) error {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -104,7 +104,7 @@ func (s *redisStorage[T]) Delete(ctx context.Context, key string) error {
 // Enqueue добавляет элемент в конец очереди (списка) Redis.
 // Принимает имя очереди и значение для добавления.
 // Значение сериализуется в JSON перед добавлением.
-func (s *redisStorage[T]) Enqueue(ctx context.Context, queueName string, value T) error {
+func (s *redisCache[T]) Enqueue(ctx context.Context, queueName string, value T) error {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -125,7 +125,7 @@ func (s *redisStorage[T]) Enqueue(ctx context.Context, queueName string, value T
 // Возвращает элемент, флаг наличия элемента и ошибку.
 // Если очередь пуста, возвращает false во втором возвращаемом значении.
 // Значение десериализуется из JSON перед возвратом.
-func (s *redisStorage[T]) Dequeue(ctx context.Context, queueName string) (T, bool, error) {
+func (s *redisCache[T]) Dequeue(ctx context.Context, queueName string) (T, bool, error) {
 	var zero T
 
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -152,7 +152,7 @@ func (s *redisStorage[T]) Dequeue(ctx context.Context, queueName string) (T, boo
 // Возвращает элемент, флаг наличия элемента и ошибку.
 // Если очередь пуста, возвращает false во втором возвращаемом значении.
 // Значение десериализуется из JSON перед возвратом.
-func (s *redisStorage[T]) Peek(ctx context.Context, queueName string) (T, bool, error) {
+func (s *redisCache[T]) Peek(ctx context.Context, queueName string) (T, bool, error) {
 	var zero T
 
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
@@ -178,7 +178,7 @@ func (s *redisStorage[T]) Peek(ctx context.Context, queueName string) (T, bool, 
 // Remove удаляет один элемент из начала очереди без возврата его значения.
 // Возвращает флаг успешности операции и ошибку.
 // Если очередь пуста, возвращает false в первом возвращаемом значении.
-func (s *redisStorage[T]) Remove(ctx context.Context, queueName string) (bool, error) {
+func (s *redisCache[T]) Remove(ctx context.Context, queueName string) (bool, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -196,7 +196,7 @@ func (s *redisStorage[T]) Remove(ctx context.Context, queueName string) (bool, e
 
 // QueueLen возвращает текущую длину очереди.
 // Возвращает количество элементов в очереди и ошибку, если операция не удалась.
-func (s *redisStorage[T]) QueueLen(ctx context.Context, queueName string) (int64, error) {
+func (s *redisCache[T]) QueueLen(ctx context.Context, queueName string) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 1*time.Second)
 	defer cancel()
 
@@ -210,6 +210,6 @@ func (s *redisStorage[T]) QueueLen(ctx context.Context, queueName string) (int64
 
 // Close закрывает соединение с Redis.
 // Должен вызываться при завершении работы с хранилищем.
-func (s *redisStorage[T]) Close() error {
+func (s *redisCache[T]) Close() error {
 	return s.client.Close()
 }

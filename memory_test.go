@@ -1,4 +1,4 @@
-package storage_test
+package cache_test
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestMemoryStorage_StringOperations(t *testing.T) {
-	s, _ := storage.NewMemory[string](50 * time.Millisecond)
+	s, _ := cache.NewMemory[string](50 * time.Millisecond)
 	defer s.Close()
 	ctx := context.Background()
 
@@ -34,7 +34,7 @@ func TestMemoryStorage_StructOperations(t *testing.T) {
 		Age  int
 	}
 
-	s, _ := storage.NewMemory[testStruct](50 * time.Millisecond)
+	s, _ := cache.NewMemory[testStruct](50 * time.Millisecond)
 	defer s.Close()
 	ctx := context.Background()
 
@@ -48,7 +48,7 @@ func TestMemoryStorage_StructOperations(t *testing.T) {
 }
 
 func TestMemoryStorage_TTLExpiration(t *testing.T) {
-	s, _ := storage.NewMemory[string](10 * time.Millisecond)
+	s, _ := cache.NewMemory[string](10 * time.Millisecond)
 	defer s.Close()
 	ctx := context.Background()
 
@@ -60,7 +60,7 @@ func TestMemoryStorage_TTLExpiration(t *testing.T) {
 }
 
 func TestMemoryStorage_ConcurrentAccess(t *testing.T) {
-	s, _ := storage.NewMemory[int](1 * time.Second)
+	s, _ := cache.NewMemory[int](1 * time.Second)
 	defer s.Close()
 	ctx := context.Background()
 

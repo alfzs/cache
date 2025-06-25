@@ -1,4 +1,4 @@
-package storage
+package cache
 
 import (
 	"context"
@@ -6,11 +6,11 @@ import (
 	"time"
 )
 
-// memoryStorage представляет реализацию хранилища данных в памяти.
+// memoryCache представляет реализацию хранилища данных в памяти.
 // Это обобщенная структура, которая может работать с любым типом данных T.
 // Хранит данные в map для ключ-значение и map для очередей.
 // Использует sync.RWMutex для безопасного доступа из разных горутин.
-type memoryStorage[T any] struct {
+type memoryCache[T any] struct {
 	items   map[string]item[T] // Хранилище ключ-значение
 	queues  map[string][]T     // Хранилище очередей (имя очереди -> элементы)
 	itemMu  sync.RWMutex       // Мьютекс для доступа к items
@@ -18,11 +18,11 @@ type memoryStorage[T any] struct {
 	stop    chan struct{}      // Канал для остановки сборщика мусора
 }
 
-// newMemoryStorage создает новый экземпляр in-memory хранилища.
+// newMemoryCache создает новый экземпляр in-memory хранилища.
 // Принимает интервал очистки устаревших элементов и возвращает интерфейс Storage[T].
 // Запускает фоновую горутину для периодической очистки устаревших элементов.
-func newMemoryStorage[T any](cleanupInterval time.Duration) Storage[T] {
-	s := &memoryStorage[T]{
+func newMemoryCache[T any](cleanupInterval time.Duration) Cache[T] {
+	s := &memoryCache[T]{
 		items:  make(map[string]item[T]),
 		queues: make(map[string][]T),
 		stop:   make(chan struct{}),
@@ -45,14 +45,14 @@ func (i item[T]) isExpired() bool {
 
 // Close останавливает фоновый сборщик мусора и освобождает ресурсы.
 // Должен вызываться при завершении работы с хранилищем.
-func (s *memoryStorage[T]) Close() error {
+func (s *memoryCache[T]) Close() error {
 	close(s.stop) // Посылаем сигнал остановки сборщику мусора
 	return nil
 }
 
 // runGC запускает сборщик мусора, который периодически удаляет устаревшие элементы.
 // Работает в фоновой горутине до получения сигнала остановки.
-func (s *memoryStorage[T]) runGC(interval time.Duration) {
+func (s *memoryCache[T]) runGC(interval time.Duration) {
 	ticker := time.NewTicker(interval) // Таймер для периодического запуска
 	defer ticker.Stop()                // Освобождаем ресурсы таймера при остановке
 
@@ -69,7 +69,7 @@ func (s *memoryStorage[T]) runGC(interval time.Duration) {
 // Set сохраняет значение в хранилище по указанному ключу.
 // Принимает контекст, ключ, значение и время жизни записи (TTL).
 // Если TTL > 0, устанавливает время жизни записи, иначе запись хранится бессрочно.
-func (s *memoryStorage[T]) Set(ctx context.Context, key string, value T, ttl time.Duration) error {
+func (s *memoryCache[T]) Set(ctx context.Context, key string, value T, ttl time.Duration) error {
 	var expiration int64
 	if ttl > 0 {
 		expiration = time.Now().Add(ttl).UnixNano() // Вычисляем время истечения
@@ -88,7 +88,7 @@ func (s *memoryStorage[T]) Set(ctx context.Context, key string, value T, ttl tim
 // Get получает значение из хранилища по ключу.
 // Возвращает значение, флаг наличия значения и ошибку.
 // Если ключ не найден или срок действия истек, возвращает false во втором возвращаемом значении.
-func (s *memoryStorage[T]) Get(ctx context.Context, key string) (T, bool, error) {
+func (s *memoryCache[T]) Get(ctx context.Context, key string) (T, bool, error) {
 	s.itemMu.RLock()         // Блокируем на чтение
 	defer s.itemMu.RUnlock() // Гарантируем разблокировку
 
@@ -102,7 +102,7 @@ func (s *memoryStorage[T]) Get(ctx context.Context, key string) (T, bool, error)
 
 // Delete удаляет значение из хранилища по ключу.
 // Возвращает ошибку, если операция не удалась.
-func (s *memoryStorage[T]) Delete(ctx context.Context, key string) error {
+func (s *memoryCache[T]) Delete(ctx context.Context, key string) error {
 	s.itemMu.Lock()         // Блокируем на запись
 	defer s.itemMu.Unlock() // Гарантируем разблокировку
 	delete(s.items, key)
@@ -112,7 +112,7 @@ func (s *memoryStorage[T]) Delete(ctx context.Context, key string) error {
 // Enqueue добавляет элемент в конец очереди.
 // Принимает имя очереди и значение для добавления.
 // Если очередь не существует, создает новую.
-func (s *memoryStorage[T]) Enqueue(ctx context.Context, queueName string, value T) error {
+func (s *memoryCache[T]) Enqueue(ctx context.Context, queueName string, value T) error {
 	s.queueMu.Lock()         // Блокируем на запись
 	defer s.queueMu.Unlock() // Гарантируем разблокировку
 
@@ -123,7 +123,7 @@ func (s *memoryStorage[T]) Enqueue(ctx context.Context, queueName string, value 
 // Dequeue извлекает и удаляет элемент из начала очереди.
 // Возвращает элемент, флаг наличия элемента и ошибку.
 // Если очередь пуста, возвращает false во втором возвращаемом значении.
-func (s *memoryStorage[T]) Dequeue(ctx context.Context, queueName string) (T, bool, error) {
+func (s *memoryCache[T]) Dequeue(ctx context.Context, queueName string) (T, bool, error) {
 	s.queueMu.Lock()         // Блокируем на запись
 	defer s.queueMu.Unlock() // Гарантируем разблокировку
 
@@ -147,7 +147,7 @@ func (s *memoryStorage[T]) Dequeue(ctx context.Context, queueName string) (T, bo
 // Peek возвращает первый элемент из очереди без его удаления.
 // Возвращает элемент, флаг наличия элемента и ошибку.
 // Если очередь пуста, возвращает false во втором возвращаемом значении.
-func (s *memoryStorage[T]) Peek(ctx context.Context, queueName string) (T, bool, error) {
+func (s *memoryCache[T]) Peek(ctx context.Context, queueName string) (T, bool, error) {
 	s.queueMu.RLock()         // Блокируем на чтение
 	defer s.queueMu.RUnlock() // Гарантируем разблокировку
 
@@ -163,7 +163,7 @@ func (s *memoryStorage[T]) Peek(ctx context.Context, queueName string) (T, bool,
 // Remove удаляет первый элемент из очереди без его возврата.
 // Возвращает флаг успешности операции и ошибку.
 // Если очередь пуста, возвращает false в первом возвращаемом значении.
-func (s *memoryStorage[T]) Remove(ctx context.Context, queueName string) (bool, error) {
+func (s *memoryCache[T]) Remove(ctx context.Context, queueName string) (bool, error) {
 	s.queueMu.Lock()         // Блокируем на запись
 	defer s.queueMu.Unlock() // Гарантируем разблокировку
 
@@ -185,7 +185,7 @@ func (s *memoryStorage[T]) Remove(ctx context.Context, queueName string) (bool, 
 // QueueLen возвращает текущую длину очереди.
 // Возвращает количество элементов в очереди и ошибку, если операция не удалась.
 // Если очередь не существует, возвращает 0.
-func (s *memoryStorage[T]) QueueLen(ctx context.Context, queueName string) (int64, error) {
+func (s *memoryCache[T]) QueueLen(ctx context.Context, queueName string) (int64, error) {
 	s.queueMu.RLock()         // Блокируем на чтение
 	defer s.queueMu.RUnlock() // Гарантируем разблокировку
 
@@ -198,7 +198,7 @@ func (s *memoryStorage[T]) QueueLen(ctx context.Context, queueName string) (int6
 
 // deleteExpired удаляет все элементы с истекшим сроком жизни из хранилища.
 // Вызывается периодически сборщиком мусора.
-func (s *memoryStorage[T]) deleteExpired() {
+func (s *memoryCache[T]) deleteExpired() {
 	s.itemMu.Lock()         // Блокируем на запись
 	defer s.itemMu.Unlock() // Гарантируем разблокировку
 
