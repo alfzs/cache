@@ -1,6 +1,6 @@
-# Хранилище данных (Storage)
+# Хранилище данных (Cache)
 
-Пакет `storage` предоставляет унифицированный интерфейс для работы с key-value хранилищем и очередями с двумя реализациями: in-memory и Redis.
+Пакет `Cache` предоставляет унифицированный интерфейс для работы с key-value хранилищем и очередями с двумя реализациями: in-memory и Redis.
 
 ## Возможности
 
@@ -19,7 +19,7 @@
 
 ## Реализации
 
-### 1. In-Memory хранилище (`memoryStorage`)
+### 1. In-Memory хранилище (`memoryCache`)
 
 - Хранит данные в оперативной памяти
 - Поддерживает автоматическую очистку устаревших записей (GC)
@@ -29,10 +29,10 @@
 **Инициализация:**
 
 ```go
-storage, err := storage.NewMemory[T](cleanupInterval)
+cache, err := cache.NewMemory[T](cleanupInterval)
 ```
 
-### 2. Redis хранилище (`redisStorage`)
+### 2. Redis хранилище (`redisCache`)
 
 - Использует Redis в качестве бэкенда
 - Поддерживает все основные операции Redis
@@ -42,13 +42,13 @@ storage, err := storage.NewMemory[T](cleanupInterval)
 **Инициализация:**
 
 ```go
-config := storage.RedisConfig{
+config := cache.RedisConfig{
     Addr:     "localhost:6379",
     Username: "",
     Password: "",
     DB:       0,
 }
-storage, err := storage.NewRedis[T](config)
+cache, err := cache.NewRedis[T](config)
 ```
 
 ## Примеры использования
@@ -57,33 +57,33 @@ storage, err := storage.NewRedis[T](config)
 
 ```go
 // Создание хранилища
-storage, _ := storage.NewMemory[string](time.Minute)
+cache, _ := cache.NewMemory[string](time.Minute)
 
 // Сохранение значения
 ctx := context.Background()
-err := storage.Set(ctx, "key1", "value1", time.Minute)
+err := cache.Set(ctx, "key1", "value1", time.Minute)
 
 // Получение значения
-value, exists, err := storage.Get(ctx, "key1")
+value, exists, err := cache.Get(ctx, "key1")
 
 // Удаление значения
-err = storage.Delete(ctx, "key1")
+err = cache.Delete(ctx, "key1")
 ```
 
 ### Работа с очередями
 
 ```go
 // Добавление в очередь
-err := storage.Enqueue(ctx, "queue1", "item1")
+err := cache.Enqueue(ctx, "queue1", "item1")
 
 // Извлечение из очереди
-item, exists, err := storage.Dequeue(ctx, "queue1")
+item, exists, err := cache.Dequeue(ctx, "queue1")
 
 // Просмотр первого элемента
-item, exists, err := storage.Peek(ctx, "queue1")
+item, exists, err := cache.Peek(ctx, "queue1")
 
 // Получение длины очереди
-length, err := storage.QueueLen(ctx, "queue1")
+length, err := cache.QueueLen(ctx, "queue1")
 ```
 
 ## Требования
