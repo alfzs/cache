@@ -1,72 +1,109 @@
-# go-storage
+# Хранилище данных (Storage)
 
-Универсальный абстрактный интерфейс `Storage` с двумя реализациями:
+Пакет `storage` предоставляет унифицированный интерфейс для работы с key-value хранилищем и очередями с двумя реализациями: in-memory и Redis.
 
-- In-memory (в памяти, с TTL и GC)
-- Redis (через `go-redis/v9`)
+## Возможности
 
-Подходит для временного хранения, кэширования и простых KV-хранилищ.
+- **Key-value операции**:
 
-## Интерфейс
+  - `Set` - сохранение значения по ключу с TTL
+  - `Get` - получение значения по ключу
+  - `Delete` - удаление значения по ключу
+
+- **Очереди**:
+  - `Enqueue` - добавление элемента в конец очереди
+  - `Dequeue` - извлечение и удаление элемента из начала очереди
+  - `Peek` - просмотр элемента в начале очереди без удаления
+  - `Remove` - удаление элемента из начала очереди без возврата
+  - `QueueLen` - получение длины очереди
+
+## Реализации
+
+### 1. In-Memory хранилище (`memoryStorage`)
+
+- Хранит данные в оперативной памяти
+- Поддерживает автоматическую очистку устаревших записей (GC)
+- Потокобезопасная реализация с использованием `sync.RWMutex`
+- Не требует внешних зависимостей
+
+**Инициализация:**
 
 ```go
-type Storage interface {
-	Set(key string, value any, ttl time.Duration) error
-	Get(key string) (any, bool, error)
-	Delete(key string) error
-	Close() error
-}
+storage, err := storage.NewMemory[T](cleanupInterval)
 ```
+
+### 2. Redis хранилище (`redisStorage`)
+
+- Использует Redis в качестве бэкенда
+- Поддерживает все основные операции Redis
+- Автоматическая сериализация/десериализация данных в JSON
+- Требует подключения к серверу Redis
+
+**Инициализация:**
+
+```go
+config := storage.RedisConfig{
+    Addr:     "localhost:6379",
+    Username: "",
+    Password: "",
+    DB:       0,
+}
+storage, err := storage.NewRedis[T](config)
+```
+
+## Примеры использования
+
+### Работа с ключами и значениями
+
+```go
+// Создание хранилища
+storage, _ := storage.NewMemory[string](time.Minute)
+
+// Сохранение значения
+ctx := context.Background()
+err := storage.Set(ctx, "key1", "value1", time.Minute)
+
+// Получение значения
+value, exists, err := storage.Get(ctx, "key1")
+
+// Удаление значения
+err = storage.Delete(ctx, "key1")
+```
+
+### Работа с очередями
+
+```go
+// Добавление в очередь
+err := storage.Enqueue(ctx, "queue1", "item1")
+
+// Извлечение из очереди
+item, exists, err := storage.Dequeue(ctx, "queue1")
+
+// Просмотр первого элемента
+item, exists, err := storage.Peek(ctx, "queue1")
+
+// Получение длины очереди
+length, err := storage.QueueLen(ctx, "queue1")
+```
+
+## Требования
+
+- Go 1.18+ (из-за использования generics)
+- Для Redis реализации требуется [go-redis](https://github.com/redis/go-redis)
 
 ## Установка
 
 ```bash
-go get github.com/alfzs/go-storage
+go get github.com/alfzs/storage
 ```
 
-## Использование
+## Особенности
 
-```go
-package main
-
-import (
-	"fmt"
-	"time"
-	"github.com/alfzs/go-storage"
-)
-
-func main() {
-	store, err := storage.NewMemory(2*time.Minute)
-	if err != nil {
-		panic(err)
-	}
-	defer store.Close()
-
-	err = store.Set("key", "value", 10*time.Second)
-	if err != nil {
-		panic(err)
-	}
-
-	val, found, err := store.Get("key")
-	if err != nil {
-		panic(err)
-	}
-	if found {
-		fmt.Println("Found:", val)
-	}
-}
-```
-
-## Redis
-
-```go
-store, err := storage.NewRedis(storage.RedisConfig{
-    Addr: "localhost:6379",
-    Password: "",
-    DB:   0,
-})
-```
+- Обе реализации поддерживают контексты для управления временем выполнения операций
+- Все методы потокобезопасны
+- In-memory реализация автоматически удаляет устаревшие записи
+- Redis реализация использует JSON для сериализации сложных типов
 
 ## Лицензия
 
-MIT
+[MIT](LICENSE)
