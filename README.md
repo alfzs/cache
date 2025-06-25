@@ -94,7 +94,7 @@ length, err := storage.QueueLen(ctx, "queue1")
 ## Установка
 
 ```bash
-go get github.com/alfzs/storage
+go get github.com/alfzs/cache
 ```
 
 ## Особенности
